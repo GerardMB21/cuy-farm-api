@@ -18,3 +18,20 @@ var/
 
 # Serverless directories
 .serverless
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node (serverless plugins)
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# Downloaded agent skills (restore from skills-lock.json)
+.agents/
+.aider-desk/
