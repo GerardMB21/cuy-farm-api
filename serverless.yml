@@ -5,11 +5,106 @@ app: cuy-farm-api
 # "service" is the name of this project. This will also be added to your AWS resource names.
 service: cuy-farm-api
 
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    usePoetry: true
+    # boto3 is already provided by the Lambda runtime
+    noDeploy:
+      - boto3
+      - botocore
+
 provider:
   name: aws
   runtime: python3.14
   architecture: arm64
+  environment:
+    YARDS_TABLE: ${self:service}-${sls:stage}-yards
+    YARD_NAMES_TABLE: ${self:service}-${sls:stage}-yard-names
+    MOVEMENTS_TABLE: ${self:service}-${sls:stage}-movements
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+          Resource:
+            - !GetAtt YardsTable.Arn
+            - !GetAtt YardNamesTable.Arn
+            - !GetAtt MovementsTable.Arn
+
+package:
+  patterns:
+    - '!**'
+    - 'src/**'
 
 functions:
-  hello:
-    handler: handler.hello
+  createYard:
+    handler: src.routes.yards.create
+    events:
+      - httpApi: { method: POST, path: /yards }
+  listYards:
+    handler: src.routes.yards.list_all
+    events:
+      - httpApi: { method: GET, path: /yards }
+  getYard:
+    handler: src.routes.yards.get
+    events:
+      - httpApi: { method: GET, path: '/yards/{yardId}' }
+  updateYard:
+    handler: src.routes.yards.update
+    events:
+      - httpApi: { method: PATCH, path: '/yards/{yardId}' }
+  deleteYard:
+    handler: src.routes.yards.delete
+    events:
+      - httpApi: { method: DELETE, path: '/yards/{yardId}' }
+  createMovement:
+    handler: src.routes.movements.create
+    events:
+      - httpApi: { method: POST, path: /movements }
+  listMovements:
+    handler: src.routes.movements.list_all
+    events:
+      - httpApi: { method: GET, path: /movements }
+  getMovement:
+    handler: src.routes.movements.get
+    events:
+      - httpApi: { method: GET, path: '/movements/{movementId}' }
+
+resources:
+  Resources:
+    YardsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.YARDS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: id, AttributeType: S }
+        KeySchema:
+          - { AttributeName: id, KeyType: HASH }
+    # Lock items keyed by normalized yard name; enforces name uniqueness.
+    YardNamesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.YARD_NAMES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: id, AttributeType: S }
+        KeySchema:
+          - { AttributeName: id, KeyType: HASH }
+    MovementsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.MOVEMENTS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: id, AttributeType: S }
+        KeySchema:
+          - { AttributeName: id, KeyType: HASH }
