@@ -4,17 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the project
 
-This is an unmodified Serverless Framework v4 "AWS Python" template scaffold. It contains a single Lambda function (`hello` in `handler.py`) with no event triggers, no persistence, no dependencies file, no tests, and no linter config. Not a git repository yet. Update this file as real structure emerges.
+Serverless Python API for cuy (guinea pig) farm yards and movements. Poetry manages dependencies with an in-project `.venv` (`poetry install`, `poetry run python ...`). No tests or linter yet.
 
 ## Commands
 
-- Deploy: `serverless deploy`
-- Invoke deployed function: `serverless invoke --function hello`
-- Invoke locally: `serverless invoke local --function hello`
-- Bundle third-party Python deps: `serverless plugin install -n serverless-python-requirements`, then list dependencies in `requirements.txt` (this also creates `package.json`).
+- Install deps / create `.venv`: `poetry install`
+- Deploy: `serverless deploy` (needs the `serverless-python-requirements` plugin installed via `serverless plugin install -n serverless-python-requirements`; it uses Poetry)
+- Invoke locally: `serverless invoke local --function listYards`
 
 ## Architecture
 
-- `serverless.yml` defines the service (`cuy-farm-api`, org `gerardmatos`, app `cuy-farm-api`), provider AWS with runtime `python3.14` on `arm64`, and maps each function to a handler (`handler.hello` → `hello()` in `handler.py`). New Lambdas need a `functions:` entry here, and HTTP routes need an `events:` entry (none exist yet).
-- Handlers follow the Lambda signature `(event, context)` and return an API-Gateway-style dict `{"statusCode": ..., "body": <json string>}`.
-- `.serverless/` (build output) is gitignored.
+All code lives in `src/`:
+
+- `models/` – Pydantic models/schemas (`Yard`, `YardCreate`, `YardUpdate`, `Movement`, `MovementCreate`, enums `MovementType`, `Gender`).
+- `services/` – business logic (`yard_service`, `movement_service`). Movements adjust yard totals transactionally; `notDefined` gender is counted as babies.
+- `routes/` – one Lambda handler per endpoint, wrapped with `@handler` from `utils/http.py` (maps validation/service errors to HTTP responses).
+- `utils/` – reusable code: `db.py` (generic DynamoDB put/get/update/delete/scan/transact across tables), `http.py`.
+
+`serverless.yml` declares the functions (`src.routes.<module>.<fn>`), HTTP API events and three DynamoDB tables: yards, yard-names (name uniqueness lock items) and movements. Table names come from env vars.
+`.serverless/` (build output) is gitignored.
