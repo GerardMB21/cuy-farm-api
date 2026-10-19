@@ -1,0 +1,15 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: gerardmatos
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: cuy-farm-api
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: cuy-farm-api
+
+provider:
+  name: aws
+  runtime: python3.14
+  architecture: arm64
+
+functions:
+  hello:
+    handler: handler.hello
