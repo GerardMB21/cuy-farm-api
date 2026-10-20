@@ -6,9 +6,24 @@ app: cuy-farm-api
 service: cuy-farm-api
 
 plugins:
-  - serverless-python-requirements
+  # Must come before serverless-offline so DynamoDB Local is up before the API starts.
+  - serverless-dynamodb
+  - serverless-offline
 
 custom:
+  # DynamoDB Local for `serverless offline start`; tables are created from `resources`.
+  serverless-dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      docker: true
+      dockerPath: podman
+      # podman needs the fully qualified image name (no default registry like docker).
+      dockerImage: docker.io/amazon/dynamodb-local
+      inMemory: true
+      migrate: true
+  # Built into Serverless v4; this block must stay present to enable Python packaging.
   pythonRequirements:
     usePoetry: true
     # boto3 is already provided by the Lambda runtime
@@ -18,7 +33,9 @@ custom:
 
 provider:
   name: aws
-  runtime: python3.14
+  # serverless-offline doesn't know python3.14 yet; run it with --param="runtime=python3.13"
+  # (it still spawns the local python3, so the code runs on 3.14).
+  runtime: ${param:runtime, 'python3.14'}
   architecture: arm64
   environment:
     YARDS_TABLE: ${self:service}-${sls:stage}-yards
@@ -77,6 +94,14 @@ functions:
     handler: src.routes.movements.get
     events:
       - httpApi: { method: GET, path: '/movements/{movementId}' }
+  openApiSpec:
+    handler: src.routes.docs.openapi
+    events:
+      - httpApi: { method: GET, path: /openapi.json }
+  apiDocs:
+    handler: src.routes.docs.ui
+    events:
+      - httpApi: { method: GET, path: /docs }
 
 resources:
   Resources:

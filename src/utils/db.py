@@ -16,7 +16,17 @@ _serializer = TypeSerializer()
 def get_resource():
     global _resource
     if _resource is None:
-        _resource = boto3.resource("dynamodb")
+        if os.environ.get("IS_OFFLINE"):
+            # serverless-offline: talk to DynamoDB Local; it accepts any credentials.
+            _resource = boto3.resource(
+                "dynamodb",
+                endpoint_url=os.environ.get("DYNAMODB_ENDPOINT", "http://localhost:8000"),
+                region_name="localhost",
+                aws_access_key_id="local",
+                aws_secret_access_key="local",
+            )
+        else:
+            _resource = boto3.resource("dynamodb")
     return _resource
 
 
