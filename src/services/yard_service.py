@@ -14,7 +14,13 @@ def _is_cancelled(exc: ClientError) -> bool:
 
 
 def create_yard(data: YardCreate) -> Yard:
-    yard = Yard(**data.model_dump())
+    # Initial counts are the yard's starting stock.
+    yard = Yard(
+        **data.model_dump(),
+        totalMales=data.initialMales or 0,
+        totalFemales=data.initialFemales or 0,
+        totalBabies=data.initialBabies or 0,
+    )
     try:
         db.transact_write(
             [
@@ -28,7 +34,7 @@ def create_yard(data: YardCreate) -> Yard:
                 {
                     "Put": {
                         "TableName": db.YARDS_TABLE,
-                        "Item": db.serialize(yard.model_dump(exclude_none=True)),
+                        "Item": db.serialize(yard.model_dump(exclude_none=True, exclude={"total"})),
                         "ConditionExpression": "attribute_not_exists(id)",
                     }
                 },
@@ -60,7 +66,7 @@ def update_yard(yard_id: str, data: YardUpdate) -> Yard:
         {
             "Put": {
                 "TableName": db.YARDS_TABLE,
-                "Item": db.serialize(updated.model_dump(exclude_none=True)),
+                "Item": db.serialize(updated.model_dump(exclude_none=True, exclude={"total"})),
                 "ConditionExpression": "attribute_exists(id)",
             }
         }
