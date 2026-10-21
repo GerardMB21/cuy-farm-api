@@ -37,6 +37,12 @@ provider:
   # (it still spawns the local python3, so the code runs on 3.14).
   runtime: ${param:runtime, 'python3.14'}
   architecture: arm64
+  httpApi:
+    # The frontend is served from another origin. Defaults to the local Astro dev server;
+    # set CORS_ORIGIN (env var or .env) to the frontend's domain when deploying.
+    cors:
+      allowedOrigins:
+        - ${env:CORS_ORIGIN, 'http://localhost:4321'}
   environment:
     YARDS_TABLE: ${self:service}-${sls:stage}-yards
     YARD_NAMES_TABLE: ${self:service}-${sls:stage}-yard-names
