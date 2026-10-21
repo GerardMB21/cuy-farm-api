@@ -14,19 +14,25 @@ TOTAL_FIELD = {
 }
 
 
-def _adjust_total(yard_id: str, field: str, delta: int) -> dict:
-    update = {
-        "TableName": db.YARDS_TABLE,
-        "Key": db.serialize({"id": yard_id}),
-        "UpdateExpression": "SET #f = #f + :d",
-        "ExpressionAttributeNames": {"#f": field},
-        "ExpressionAttributeValues": db.serialize({":d": delta}),
-        "ConditionExpression": "attribute_exists(id)",
+def _adjust_totals(yard_id: str, deltas: dict[str, int]) -> dict:
+    names, values, sets, conditions = {}, {}, [], ["attribute_exists(id)"]
+    for i, (field, delta) in enumerate(deltas.items()):
+        names[f"#f{i}"] = field
+        values[f":d{i}"] = delta
+        sets.append(f"#f{i} = #f{i} + :d{i}")
+        if delta < 0:
+            values[f":min{i}"] = -delta
+            conditions.append(f"#f{i} >= :min{i}")
+    return {
+        "Update": {
+            "TableName": db.YARDS_TABLE,
+            "Key": db.serialize({"id": yard_id}),
+            "UpdateExpression": "SET " + ", ".join(sets),
+            "ExpressionAttributeNames": names,
+            "ExpressionAttributeValues": db.serialize(values),
+            "ConditionExpression": " AND ".join(conditions),
+        }
     }
-    if delta < 0:
-        update["ConditionExpression"] += " AND #f >= :min"
-        update["ExpressionAttributeValues"].update(db.serialize({":min": -delta}))
-    return {"Update": update}
 
 
 def create_movement(data: MovementCreate) -> Movement:
@@ -35,17 +41,28 @@ def create_movement(data: MovementCreate) -> Movement:
         get_yard(data.toYardId)
 
     movement = Movement(**data.model_dump())
-    field = TOTAL_FIELD[movement.gender]
+    field = TOTAL_FIELD[movement.genderFrom]
+    quantity = movement.quantity
 
     if movement.type == MovementType.ADD:
-        adjustments = [_adjust_total(movement.fromYardId, field, movement.quantity)]
+        adjustments = [_adjust_totals(movement.fromYardId, {field: quantity})]
     elif movement.type == MovementType.TRANSFER:
         adjustments = [
-            _adjust_total(movement.fromYardId, field, -movement.quantity),
-            _adjust_total(movement.toYardId, field, movement.quantity),
+            _adjust_totals(movement.fromYardId, {field: -quantity}),
+            _adjust_totals(movement.toYardId, {field: quantity}),
         ]
+    elif movement.type == MovementType.DEFINE:
+        target = TOTAL_FIELD[movement.genderTo]
+        if movement.toYardId:
+            adjustments = [
+                _adjust_totals(movement.fromYardId, {field: -quantity}),
+                _adjust_totals(movement.toYardId, {target: quantity}),
+            ]
+        else:
+            # Same item can't appear twice in a transaction, so both fields go in one update.
+            adjustments = [_adjust_totals(movement.fromYardId, {field: -quantity, target: quantity})]
     else:
-        adjustments = [_adjust_total(movement.fromYardId, field, -movement.quantity)]
+        adjustments = [_adjust_totals(movement.fromYardId, {field: -quantity})]
 
     try:
         db.transact_write(
