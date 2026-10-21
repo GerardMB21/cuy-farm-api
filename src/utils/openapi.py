@@ -38,7 +38,8 @@ _NOT_FOUND = _error("Not found")
 
 def build_spec() -> dict[str, Any]:
     _, defs = models_json_schema(
-        [(m, "validation") for m in _MODELS],
+        # Response models use serialization mode so computed fields (Yard.total) are included.
+        [(m, "serialization" if m in (Yard, Movement) else "validation") for m in _MODELS],
         ref_template="#/components/schemas/{model}",
     )
     schemas = defs["$defs"]
@@ -119,7 +120,11 @@ def build_spec() -> dict[str, Any]:
                 "post": {
                     "tags": ["Movements"],
                     "summary": "Register a movement",
-                    "description": "Adjusts yard totals transactionally. `notDefined` gender is counted as babies.",
+                    "description": (
+                        "Adjusts yard totals transactionally. `notDefined` gender is counted as babies. "
+                        "`define` moves `quantity` animals from `genderFrom` to `genderTo` (never `notDefined`), "
+                        "either on the same yard or into `toYardId`."
+                    ),
                     "requestBody": _body(MovementCreate),
                     "responses": {
                         "201": _ok("Created movement", _ref(Movement)),
