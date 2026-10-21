@@ -10,24 +10,36 @@ YARD_NAMES_TABLE = os.environ.get("YARD_NAMES_TABLE", "cuy-farm-api-yard-names")
 MOVEMENTS_TABLE = os.environ.get("MOVEMENTS_TABLE", "cuy-farm-api-movements")
 
 _resource = None
+_client = None
 _serializer = TypeSerializer()
+
+
+def _connection_kwargs() -> dict[str, str]:
+    if os.environ.get("IS_OFFLINE"):
+        # serverless-offline: talk to DynamoDB Local; it accepts any credentials.
+        return {
+            "endpoint_url": os.environ.get("DYNAMODB_ENDPOINT", "http://localhost:8000"),
+            "region_name": "localhost",
+            "aws_access_key_id": "local",
+            "aws_secret_access_key": "local",
+        }
+    return {}
 
 
 def get_resource():
     global _resource
     if _resource is None:
-        if os.environ.get("IS_OFFLINE"):
-            # serverless-offline: talk to DynamoDB Local; it accepts any credentials.
-            _resource = boto3.resource(
-                "dynamodb",
-                endpoint_url=os.environ.get("DYNAMODB_ENDPOINT", "http://localhost:8000"),
-                region_name="localhost",
-                aws_access_key_id="local",
-                aws_secret_access_key="local",
-            )
-        else:
-            _resource = boto3.resource("dynamodb")
+        _resource = boto3.resource("dynamodb", **_connection_kwargs())
     return _resource
+
+
+def get_client():
+    # Plain low-level client: unlike resource.meta.client it does not auto-serialize,
+    # so it accepts the wire-format items built with serialize().
+    global _client
+    if _client is None:
+        _client = boto3.client("dynamodb", **_connection_kwargs())
+    return _client
 
 
 def get_table(table_name: str):
@@ -85,7 +97,7 @@ def transact_write(operations: list[dict[str, Any]]) -> None:
     Operations use the DynamoDB wire format, e.g.
     {"Put": {"TableName": ..., "Item": serialize(item)}}.
     """
-    get_resource().meta.client.transact_write_items(TransactItems=operations)
+    get_client().transact_write_items(TransactItems=operations)
 
 
 def serialize(item: dict[str, Any]) -> dict[str, Any]:
