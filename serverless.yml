@@ -33,10 +33,12 @@ custom:
 
 provider:
   name: aws
-  # serverless-offline doesn't know python3.14 yet; run it with --param="runtime=python3.13"
-  # (it still spawns the local python3, so the code runs on 3.14).
-  runtime: ${param:runtime, 'python3.14'}
+  # Must match the python-version in .github/workflows: dependency packaging runs `python3.13`.
+  runtime: python3.13
   architecture: arm64
+  # Custom domain per stage, from the API_DOMAIN var of each GitHub environment (none when unset,
+  # e.g. locally). Serverless v4 creates the ACM certificate, the Route53 records and the API mapping.
+  domain: ${env:API_DOMAIN, null}
   httpApi:
     # The frontend is served from another origin. Defaults to the local Astro dev server;
     # set CORS_ORIGIN (env var or .env) to the frontend's domain when deploying.
