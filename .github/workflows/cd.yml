@@ -60,7 +60,20 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy
+        timeout-minutes: 20
         run: pnpm exec serverless deploy --stage "$STAGE" --region "$AWS_REGION" --verbose
+
+      # Stopping the job doesn't stop CloudFormation: roll back an update still running after a timeout
+      # or cancel, so it doesn't keep going and lock the next deploy.
+      - name: Cancel stuck stack update
+        if: failure() || cancelled()
+        run: |
+          stack="cuy-farm-api-$STAGE"
+          status=$(aws cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)
+          echo "Stack $stack: ${status:-not found}"
+          if [ "$status" = UPDATE_IN_PROGRESS ]; then
+            aws cloudformation cancel-update-stack --stack-name "$stack"
+          fi
 
       - name: Show API URL
         run: pnpm exec serverless info --stage "$STAGE" --region "$AWS_REGION"
