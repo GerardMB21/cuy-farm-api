@@ -4,6 +4,8 @@ org: gerardmatos
 app: cuy-farm-api
 # "service" is the name of this project. This will also be added to your AWS resource names.
 service: cuy-farm-api
+# Pinned to the serverless version in package.json, so CI doesn't download a new framework on every run.
+frameworkVersion: '4.45.0'
 
 plugins:
   # Must come before serverless-offline so DynamoDB Local is up before the API starts.

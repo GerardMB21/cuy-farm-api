@@ -1,0 +1,5 @@
+allowBuilds:
+  # Used by serverless-offline (via tsx) locally.
+  esbuild: true
+  # Its postinstall only pre-downloads the framework binary; `serverless` fetches it on first run anyway.
+  serverless: false
