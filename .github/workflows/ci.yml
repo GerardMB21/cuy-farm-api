@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  validate:
+    # Native arm64 runner: the Lambdas run on arm64, so pip must fetch arm64 wheels (pydantic-core).
+    runs-on: ubuntu-24.04-arm
+    environment: ${{ github.base_ref == 'main' && 'production' || 'development' }}
+    env:
+      STAGE: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+      API_DOMAIN: ${{ vars.API_DOMAIN }}
+      SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Serverless v4 packages Python deps via `poetry export`, which Poetry 2 ships as a plugin.
+      - name: Install Poetry
+        run: pip install poetry poetry-plugin-export
+
+      - name: Install Python dependencies
+        run: poetry install --no-interaction
+
+      # No tests or linter yet: compile everything and build the OpenAPI spec as a smoke test.
+      - name: Smoke test
+        run: |
+          poetry run python -m compileall -q src
+          poetry run python -c "import json, src.routes.yards, src.routes.movements, src.routes.docs; from src.utils.openapi import build_spec; json.dumps(build_spec())"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Serverless and plugins
+        run: |
+          npm ci
+          npm install -g serverless@4
+
+      - name: Package
+        run: serverless package --stage "$STAGE" --region "$AWS_REGION"
