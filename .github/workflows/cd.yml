@@ -34,15 +34,23 @@ jobs:
       - name: Install Poetry
         run: pip install poetry poetry-plugin-export
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
+
+      # The serverless npm package is only a launcher; the framework itself is downloaded into ~/.serverless.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.serverless
+          key: serverless-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Serverless and plugins
-        run: |
-          npm ci
-          npm install -g serverless@4
+        run: pnpm install --frozen-lockfile
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -50,7 +58,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy
-        run: serverless deploy --stage "$STAGE" --region "$AWS_REGION"
+        run: pnpm exec serverless deploy --stage "$STAGE" --region "$AWS_REGION"
 
       - name: Show API URL
-        run: serverless info --stage "$STAGE" --region "$AWS_REGION"
+        run: pnpm exec serverless info --stage "$STAGE" --region "$AWS_REGION"

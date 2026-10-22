@@ -35,15 +35,23 @@ jobs:
           poetry run python -m compileall -q src
           poetry run python -c "import json, src.routes.yards, src.routes.movements, src.routes.docs; from src.utils.openapi import build_spec; json.dumps(build_spec())"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
+
+      # The serverless npm package is only a launcher; the framework itself is downloaded into ~/.serverless.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.serverless
+          key: serverless-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Serverless and plugins
-        run: |
-          npm ci
-          npm install -g serverless@4
+        run: pnpm install --frozen-lockfile
 
       - name: Package
-        run: serverless package --stage "$STAGE" --region "$AWS_REGION"
+        run: pnpm exec serverless package --stage "$STAGE" --region "$AWS_REGION"
