@@ -16,6 +16,8 @@ jobs:
   deploy:
     # Native arm64 runner: the Lambdas run on arm64, so pip must fetch arm64 wheels (pydantic-core).
     runs-on: ubuntu-24.04-arm
+    # A deploy stuck waiting on CloudFormation or ACM shouldn't burn the 6h default.
+    timeout-minutes: 30
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     env:
       STAGE: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
@@ -58,7 +60,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy
-        run: pnpm exec serverless deploy --stage "$STAGE" --region "$AWS_REGION"
+        run: pnpm exec serverless deploy --stage "$STAGE" --region "$AWS_REGION" --verbose
 
       - name: Show API URL
         run: pnpm exec serverless info --stage "$STAGE" --region "$AWS_REGION"
